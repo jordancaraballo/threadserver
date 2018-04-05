@@ -54,6 +54,9 @@ public class DateServer {
                 /* read the date from the socket */
                 String inputLine;
                 while ( (inputLine = bin.readLine()) != null) {
+                    /* Print from where is the connection coming */
+                    System.out.println("Conexion de " + client.getRemoteSocketAddress().toString());
+
                     /* Set ouput parameters to talk to client */
                     PrintWriter pout = new
                     PrintWriter(client.getOutputStream(), true);
