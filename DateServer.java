@@ -3,83 +3,99 @@
  * Purpose: Program that works as a server that receives and Integer
  * and calculates Pi function.
  * Input: Text value (Integer) received from the client through a socket
+ * User can set port from command line to
 */
 import java.net.*;
 import java.io.*;
 
-/* Define class to store output from pi function */
-class PIV {
-    private int value; // value to store integer sum
-    public int getValue() { // getter function
-        return value;
-    }
-    public void setValue(int value) { // setter function
-        this.value = value;
-    }
-}
+/* Define class to enable concurrent threads */
+class MultipleThreads extends Thread {
+  protected Socket socket; // socket for each client
 
-/* Define class to run thread and calculate pi */
-class Pi implements Runnable {
-    private int lim; // value that states the limit value to calculate Pi run function
-    private PIV  piValue; // PIV values that stores the end result from Pi run function
+  /* get input from main class to start threads */
+  public MultipleThreads(Socket clientSocket) {
+    this.socket = clientSocket; // socket established for a new client
+  }
 
-    public Pi(PIV piValue, int lim) {
-        this.lim     = lim;
-        this.piValue = piValue;
-    }
+  /* threads run from here */
+  public void run() {
+      InputStream    clientInput = null; /* socket for client input */
+      BufferedReader bufferInput = null; /* receive value from socket */
+      PrintWriter    printOutput = null; /* establish output parameters to talk to client */
+      /* try and catch it case something went wrong */
+      try {
+          clientInput = socket.getInputStream(); /* set socket for client input */
+          bufferInput = new BufferedReader(new InputStreamReader(clientInput)); /* set value from socket */
+          printOutput = new PrintWriter(socket.getOutputStream(), true); /* set ouput parameters to talk to client */
+      } catch (IOException e) {
+          return;
+      }
 
-    /* subrouting given by Prof. Sotero */
-    public void run() { // threads run from here
-        int cont = 0;   // counter to sum all ocurrences of the prime numbers
-        for (int n = 2; n <= lim; n++) {
-            int div = 2;
-            for (; div < n; div++)
-                if (n % div == 0) break;
-            if (div == n) cont++;
-        }
-        piValue.setValue(cont); // set value to PIV object
+      /* Print from where the connection is coming and start reading the socket */
+      System.out.println("Connection from " + socket.getRemoteSocketAddress().toString());
+
+      /* Read and execute Pi steps */
+      String inputLine; /* variable to store client input */
+      while (true) {
+          /* first try: get the connection working properly */
+          try {
+              inputLine = bufferInput.readLine(); /* read input from client */
+              if ((inputLine == null) || inputLine.equalsIgnoreCase("QUIT")) {
+                  socket.close(); // close the socket if the is not input or quit
+                  return; // get out from here
+              }
+              else {
+                  /* Verify if value is not negative */
+                  try {
+                  if (Integer.parseInt(inputLine) < 0) {
+                      printOutput.println("The value needs to be a positive integer. Closing connection.");
+                  }
+                  else {
+                      /* subrouting given by Prof. Sotero */
+                      int piValue = 0; // counter to sum all ocurrences of the prime numbers
+                      for (int n = 2; n <= Integer.parseInt(inputLine); n++) {
+                          int div = 2;
+                          for (; div < n; div++)
+                              if (n % div == 0) break;
+                          if (div == n) piValue++;
+                      }
+                      /* Send to the client the value of the pi function */
+                      printOutput.println("The value "+ inputLine +" has "+ piValue +" prime numbers.");
+                  }
+                } catch (NumberFormatException ex ) { printOutput.println("The value needs to be a positive integer. Closing connection."); }
+              }
+          } catch (IOException e) {
+              e.printStackTrace();
+              return;
+          }
+       }
     }
 }
 
 /* Define server class and get input from server to execute pi */
 public class DateServer {
     public static void main(String[] args) {
+        /* Establish server socket variables */
+        ServerSocket serverSocket = null;
+        Socket       socket = null;
+
+        /* Start server socket at port default: 6013 */
+        int port = 6013;
+        if (args.length != 0) { port = Integer.parseInt(args[0]); }
+
         try {
-            ServerSocket sock = new ServerSocket(6013); // set server socket to listen at port
-            /* now listen for connections */
-            while (true) {
-                Socket client = sock.accept();
-                /* receive value from socket */
-                BufferedReader bin = new BufferedReader(new InputStreamReader(client.getInputStream()));
-                /* read the date from the socket */
-                String inputLine;
-                while ( (inputLine = bin.readLine()) != null) {
-                    /* Print from where is the connection coming */
-                    System.out.println("Conexion de " + client.getRemoteSocketAddress().toString());
-
-                    /* Set ouput parameters to talk to client */
-                    PrintWriter pout = new
-                    PrintWriter(client.getOutputStream(), true);
-
-                    /* Verify if value is not negative */
-                    if (Integer.parseInt(inputLine) < 0) {
-                      pout.println("El valor del cliente debe ser entero positivo.");
-                    }
-
-                    /* Create and start threads */
-                    PIV piObject = new PIV(); // define PIV object
-                    Thread thrd = new Thread(new Pi(piObject, Integer.parseInt(inputLine))); // create thread
-                    thrd.start(); // start thread
-                    try {
-                        thrd.join();
-                        /* write the Date to the socket */
-                        pout.println("El valor "+ inputLine +" tiene "+piObject.getValue()+" primos.");
-                    } catch (InterruptedException ie) { }
-                }
-            }
+            serverSocket = new ServerSocket(port);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        catch (IOException ioe) {
-            System.err.println(ioe);
+        /* While socket is active, maintain connection alive */
+        while (true) {
+            try {
+                socket = serverSocket.accept();
+            } catch (IOException e) {
+                System.out.println("I/O error: " + e);
+            }
+            new MultipleThreads(socket).start();
         }
     }
 }
