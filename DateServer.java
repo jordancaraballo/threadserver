@@ -32,7 +32,9 @@ class MultipleThreads extends Thread {
       }
 
       /* Print from where the connection is coming and start reading the socket */
-      System.out.println("Connection from " + socket.getRemoteSocketAddress().toString());
+      System.out.println("Connection from: " + socket.getRemoteSocketAddress().toString() +
+        " hostname: " + socket.getInetAddress().getHostName()
+      );
 
       /* Read and execute Pi steps */
       String inputLine; /* variable to store client input */
